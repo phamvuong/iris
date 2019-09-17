@@ -14,11 +14,8 @@ class alertmanager(object):
     allow_read_no_auth = False
 
     def validate_post(self, body):
-        if not all(k in body for k in("version", "status", "alerts")):
-            raise HTTPBadRequest('missing version, status and/or alert attributes')
-
-        if 'iris_plan' not in body["groupLabels"]:
-            raise HTTPBadRequest('missing iris_plan in group labels')
+        if not all(k in body for k in("version", "status", "alerts", "receiver")):
+            raise HTTPBadRequest('missing version, status, receiver and/or alert attributes')
 
     def create_context(self, body):
         context_json_str = ujson.dumps(body)
@@ -48,7 +45,7 @@ class alertmanager(object):
         self.validate_post(alert_params)
 
         with db.guarded_session() as session:
-            plan = alert_params['groupLabels']['iris_plan']
+            plan = alert_params['receiver']
             plan_id = session.execute('SELECT `plan_id` FROM `plan_active` WHERE `name` = :plan',
                                       {'plan': plan}).scalar()
             if not plan_id:
