@@ -720,6 +720,7 @@ class AuthMiddleware(object):
             self.process_resource = self.debug_auth
 
     def debug_auth(self, req, resp, resource, params):
+        cache.cache_applications()
         req.context['username'] = req.env.get('beaker.session', {}).get('user', None)
         method = req.method
 
@@ -762,6 +763,7 @@ class AuthMiddleware(object):
             return
 
     def process_resource(self, req, resp, resource, params):  # pragma: no cover
+        cache.cache_applications()
         req.context['username'] = req.env.get('beaker.session', {}).get('user', None)
         method = req.method
 
@@ -1117,6 +1119,7 @@ class Plans(object):
         GET /v0/plans?target=foo&active=1 HTTP/1.1
 
         '''
+        cache.init()
         query_limit = req.get_param_as_int('limit')
         req.params.pop('limit', None)
         fields = req.get_param_as_list('fields')
@@ -1275,6 +1278,7 @@ class Plans(object):
         is provided to define the recipient of a message. See incidents POST endpoint for details.
 
         '''
+        cache.init()
         plan_params = ujson.loads(req.context['body'])
         try:
             run_validation('plan', plan_params)
@@ -1505,6 +1509,7 @@ class Incidents(object):
 
         This will map target 0 to the user "jdoe", and target 1 to the team "team-foo".
         '''
+        cache.init()
         incident_params = ujson.loads(req.context['body'])
         dynamic_targets = []
         if 'plan' not in incident_params:
@@ -1991,6 +1996,7 @@ class Notifications(object):
         - message queue request rejected by sender
         '''
 
+        cache.init()
         message = ujson.loads(req.context['body'])
         msg_attrs = set(message)
         if not msg_attrs >= self.required_attrs:
@@ -2406,6 +2412,7 @@ class Target(object):
     allow_read_no_auth = False
 
     def on_get(self, req, resp, target_type):
+        cache.cache_target_types()
         if target_type not in cache.target_types:
             raise HTTPBadRequest('Target type %s not found' % target_type)
 
@@ -3746,6 +3753,7 @@ class ResponseMixin(object):
 
 class ResponseEmail(ResponseMixin):
     def on_post(self, req, resp):
+        cache.init()
         gmail_params = ujson.loads(req.context['body'])
         email_headers = {header['name']: header['value'] for header in gmail_params['headers']}
         subject = email_headers.get('Subject')
@@ -4218,6 +4226,7 @@ class ApplicationStats(object):
         self.real_time = cfg.get('real_time', True)
 
     def on_get(self, req, resp, app_name):
+        cache.cache_applications()
         app = cache.applications.get(app_name)
         if not app:
             raise HTTPNotFound()
@@ -4335,13 +4344,6 @@ class Comments(object):
         conn.close()
 
 
-def update_cache_worker():
-    while True:
-        logger.debug('Reinitializing cache')
-        cache.init()
-        sleep(60)
-
-
 def json_error_serializer(req, resp, exception):
     resp.body = exception.to_json()
     resp.content_type = 'application/json'
@@ -4438,7 +4440,7 @@ def init_webhooks(config, api):
 
 def get_api(config):
     db.init(config)
-    spawn(update_cache_worker)
+    cache.init()
     init_plugins(config.get('plugins', {}))
     init_validators(config.get('validators', []))
     healthcheck_path = config['healthcheck_path']

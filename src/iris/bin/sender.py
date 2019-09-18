@@ -1573,6 +1573,9 @@ def main():
 
         cache.refresh()
         cache.purge()
+        api_cache.cache_priorities()
+        api_cache.cache_applications()
+        api_cache.cache_modes()
 
         # If we're currently a master, ensure our master-greenlets are running
         # and we're doing the master duties
